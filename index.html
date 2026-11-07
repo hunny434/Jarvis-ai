@@ -1,0 +1,179 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS AI</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#080d1b;color:white;
+ font-family:Arial,sans-serif;
+}
+header{text-align:center;padding:25px}
+.orb{
+ width:115px;height:115px;border-radius:50%;
+ margin:15px auto;
+ background:radial-gradient(circle,#b5f4ff,#397bff,#10152c);
+ box-shadow:0 0 35px #318cff;
+}
+h1{color:#70cfff;letter-spacing:5px}
+#status{color:#9caecb}
+#chat{height:52vh;overflow:auto;padding:15px}
+.msg{padding:13px;margin:10px 0;border-radius:15px;
+ max-width:90%;line-height:1.5}
+.user{background:#244d91;margin-left:auto}
+.bot{background:#202b43;margin-right:auto}
+.controls{padding:15px;position:sticky;bottom:0;background:#080d1b}
+input,select{
+ width:100%;padding:14px;border-radius:12px;
+ border:1px solid #5276a8;background:#17243a;
+ color:white;margin-bottom:10px;font-size:16px
+}
+button{
+ border:0;border-radius:12px;padding:13px;
+ background:#287eea;color:white;font-size:16px;
+ margin:3px
+}
+.row{display:flex;gap:6px}
+.row button{flex:1}
+</style>
+</head>
+<body>
+<header>
+ <div class="orb"></div>
+ <h1>JARVIS</h1>
+ <p>YOUR PERSONAL AI ASSISTANT</p>
+ <p id="status">सिस्टम तैयार है</p>
+</header>
+
+<div id="chat">
+ <div class="msg bot">
+ नमस्ते Hunny! मैं JARVIS हूँ। बताओ, आज मैं तुम्हारी क्या मदद करूँ?
+ </div>
+</div>
+
+<div class="controls">
+ <select id="voice">
+  <option value="female">महिला आवाज़</option>
+  <option value="male">पुरुष आवाज़</option>
+ </select>
+ <input id="message" placeholder="JARVIS से कुछ पूछो..." />
+ <div class="row">
+  <button onclick="listen()">🎤 बोलो</button>
+  <button onclick="send()">➤ भेजो</button>
+ </div>
+ <div class="row">
+  <button onclick="stopVoice()">🔇 आवाज़ बंद</button>
+  <button onclick="clearChat()">🗑️ चैट साफ़</button>
+ </div>
+</div>
+
+<script>
+// AI सर्वर तैयार होने पर यहाँ उसका HTTPS URL डालना है।
+const API_URL = "";
+
+const chat=document.getElementById("chat");
+const input=document.getElementById("message");
+const statusText=document.getElementById("status");
+
+function addMessage(text,type){
+ const div=document.createElement("div");
+ div.className="msg "+type;
+ div.textContent=text;
+ chat.appendChild(div);
+ chat.scrollTop=chat.scrollHeight;
+}
+
+function speak(text){
+ const synth=window.speechSynthesis;
+ synth.cancel();
+ const utter=new SpeechSynthesisUtterance(text);
+ utter.lang="hi-IN";
+
+ const voices=synth.getVoices();
+ const hindi=voices.filter(v=>v.lang.toLowerCase().startsWith("hi"));
+ const gender=document.getElementById("voice").value;
+
+ let selected=hindi.find(v=>{
+  const name=v.name.toLowerCase();
+  return gender==="female"
+   ? /female|woman|zira|lekha/.test(name)
+   : /male|man|david|ravi/.test(name);
+ });
+ utter.voice=selected||hindi[0]||voices[0];
+ synth.speak(utter);
+}
+
+function stopVoice(){
+ window.speechSynthesis.cancel();
+}
+
+async function send(){
+ const text=input.value.trim();
+ if(!text)return;
+
+ addMessage(text,"user");
+ input.value="";
+ statusText.textContent="JARVIS सोच रहा है...";
+
+ if(!API_URL){
+  const answer="मेरा AI सर्वर अभी कनेक्ट नहीं हुआ है। सर्वर सेट होने के बाद मैं तुम्हारे सवालों के जवाब दे पाऊँगा।";
+  addMessage(answer,"bot");
+  statusText.textContent="AI सर्वर कनेक्ट करना बाकी है";
+  speak(answer);
+  return;
+ }
+
+ try{
+  const response=await fetch(API_URL,{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({message:text})
+  });
+
+  if(!response.ok)throw new Error("Server error");
+  const data=await response.json();
+  const answer=data.reply||"मुझे जवाब नहीं मिला।";
+  addMessage(answer,"bot");
+  speak(answer);
+  statusText.textContent="JARVIS तैयार है";
+ }catch(error){
+  const answer="सर्वर से कनेक्शन नहीं हो पाया।";
+  addMessage(answer,"bot");
+  statusText.textContent="कनेक्शन की जाँच करें";
+ }
+}
+
+function listen(){
+ const Recognition=window.SpeechRecognition||
+                   window.webkitSpeechRecognition;
+ if(!Recognition){
+  alert("इस ब्राउज़र में Voice Recognition उपलब्ध नहीं है।");
+  return;
+ }
+ const recognition=new Recognition();
+ recognition.lang="hi-IN";
+ recognition.onstart=()=>statusText.textContent="सुन रहा हूँ...";
+ recognition.onresult=e=>{
+  input.value=e.results[0][0].transcript;
+ };
+ recognition.onerror=()=>statusText.textContent="फिर से कोशिश करें";
+ recognition.onend=()=>statusText.textContent="तैयार हूँ";
+ recognition.start();
+}
+
+function clearChat(){
+ chat.innerHTML="";
+ addMessage("नमस्ते Hunny! मैं JARVIS हूँ।","bot");
+}
+
+input.addEventListener("keydown",e=>{
+ if(e.key==="Enter")send();
+});
+
+window.speechSynthesis.onvoiceschanged=()=>{};
+</script>
+</body>
+</html>
